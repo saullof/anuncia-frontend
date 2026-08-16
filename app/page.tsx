@@ -45,6 +45,8 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
 type View = "onboarding" | "client" | "admin";
 type FormState = {
   destination: "whatsapp" | "instagram";
+  customerPhone: string;
+  sessionId: string;
   business: string;
   category: string;
   offer: string;
@@ -62,10 +64,12 @@ const plans = [
 
 const initialForm: FormState = {
   destination: "whatsapp",
-  business: "Fernandes Advocacia",
+  customerPhone: "",
+  sessionId: "",
+  business: "",
   category: "Advocacia",
-  offer: "Consulta jurídica para pequenas empresas e profissionais autônomos.",
-  city: "Niterói, RJ",
+  offer: "",
+  city: "",
   radius: 10,
   age: "30 a 60 anos",
   packageId: "grow",
@@ -84,7 +88,7 @@ function TopBar({ view }: { view: View }) {
   );
 }
 
-function StepShell({ step, title, subtitle, onBack, children, action, actionDisabled = false }: { step: number; title: string; subtitle: string; onBack?: () => void; children: React.ReactNode; action: () => void; actionDisabled?: boolean }) {
+function StepShell({ step, title, subtitle, onBack, children, action, actionDisabled = false, actionLabel = "Continuar" }: { step: number; title: string; subtitle: string; onBack?: () => void; children: React.ReactNode; action: () => void; actionDisabled?: boolean; actionLabel?: string }) {
   return (
     <div className="onboarding-page">
       <div className="progress-head">
@@ -96,7 +100,7 @@ function StepShell({ step, title, subtitle, onBack, children, action, actionDisa
       <section className="step-card">
         <div className="step-copy"><span className="step-kicker">VAMOS CRIAR SEU ANÚNCIO</span><h1>{title}</h1><p>{subtitle}</p></div>
         <div className="step-body">{children}</div>
-        <div className="step-action"><button className="primary" disabled={actionDisabled} onClick={action}>Continuar <Icon name="arrow" size={19}/></button><small>Leva menos de 3 minutos</small></div>
+        <div className="step-action"><button className="primary" disabled={actionDisabled} onClick={action}>{actionLabel} <Icon name="arrow" size={19}/></button><small>Leva menos de 3 minutos</small></div>
       </section>
     </div>
   );
@@ -106,26 +110,61 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(1);
   const [creative, setCreative] = useState(1);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
   const plan = plans.find((item) => item.id === form.packageId)!;
   const forward = () => setStep((current) => Math.min(5, current + 1));
   const back = step > 1 ? () => setStep((current) => current - 1) : undefined;
+  const phoneDigits = form.customerPhone.replace(/\D/g, "");
 
-  if (step === 1) return <StepShell step={1} title="Qual é o nome do seu negócio?" subtitle="Vamos começar pelo básico. Você não precisa entender de anúncios." action={forward} actionDisabled={!form.business.trim()}>
+  const submitOnboarding = async () => {
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      const response = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer_phone: phoneDigits,
+          business_name: form.business.trim(),
+          niche_category: form.category,
+          offer_description: form.offer.trim(),
+        }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data.ok || !data.session_id) {
+        throw new Error(data.error || "Não foi possível salvar seus dados agora.");
+      }
+
+      update("sessionId", data.session_id);
+      forward();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Não foi possível salvar seus dados agora.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (step === 1) return <StepShell step={1} title="Qual é o nome do seu negócio?" subtitle="Vamos começar pelo básico. Você não precisa entender de anúncios." action={forward} actionDisabled={!form.business.trim() || phoneDigits.length < 10}>
     <div className="simple-form">
       <label>Nome do negócio<input value={form.business} onChange={(event) => update("business", event.target.value)} placeholder="Ex.: Clínica Sorriso"/></label>
+      <label>Seu WhatsApp<input type="tel" inputMode="tel" value={form.customerPhone} onChange={(event) => update("customerPhone", event.target.value)} placeholder="Ex.: 5521999990001"/><span className="field-hint">Use DDI e DDD. Ex.: 5521999990001</span></label>
       <label>Show! Qual é o seu ramo?<div className="segment-grid">{[
         ["Advocacia", "briefcase"], ["Saúde", "people"], ["Loja", "store"], ["Serviços", "user"]
       ].map(([label, icon]) => <button key={label} className={form.category === label ? "selected" : ""} onClick={() => update("category", label)}><Icon name={icon as IconName} size={23}/>{label}<span>{form.category === label && <Icon name="check" size={13}/>}</span></button>)}</div></label>
     </div>
   </StepShell>;
 
-  if (step === 2) return <StepShell step={2} title="O que você quer divulgar?" subtitle="Me descreva em uma frase. Pode ser um produto, serviço ou promoção." onBack={back} action={forward} actionDisabled={!form.offer.trim()}>
+  if (step === 2) return <StepShell step={2} title="O que você quer divulgar?" subtitle="Me descreva em uma frase. Pode ser um produto, serviço ou promoção." onBack={back} action={submitOnboarding} actionDisabled={!form.offer.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
     <div className="simple-form offer-form">
       <label>Produto, serviço ou promoção<textarea value={form.offer} onChange={(event) => update("offer", event.target.value)} placeholder="Ex.: Consulta médica particular com atendimento aos sábados." maxLength={240}/><small>{form.offer.length}/240</small></label>
       <div className="destination-box"><strong>Onde as pessoas podem falar com você?</strong><div>{[
         ["whatsapp", "whatsapp", "WhatsApp"], ["instagram", "phone", "Instagram"]
       ].map(([value, icon, label]) => <button key={value} className={form.destination === value ? "selected" : ""} onClick={() => update("destination", value as FormState["destination"])}><Icon name={icon as IconName} size={20}/>{label}</button>)}</div></div>
+      {submitError && <div className="form-error" role="alert">{submitError}</div>}
     </div>
   </StepShell>;
 
