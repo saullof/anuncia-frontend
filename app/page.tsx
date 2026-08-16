@@ -133,7 +133,14 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
           offer_description: form.offer.trim(),
         }),
       });
-      const data = await response.json();
+      const responseText = await response.text();
+      let data: { ok?: boolean; session_id?: string; error?: string };
+
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error("O servidor está temporariamente indisponível. Tente novamente em instantes.");
+      }
 
       if (!response.ok || !data.ok || !data.session_id) {
         throw new Error(data.error || "Não foi possível salvar seus dados agora.");
