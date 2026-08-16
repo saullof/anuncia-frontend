@@ -49,7 +49,10 @@ type FormState = {
   sessionId: string;
   business: string;
   category: string;
-  offer: string;
+  productOrService: string;
+  targetCustomer: string;
+  mainDifferential: string;
+  specialCondition: string;
   city: string;
   radius: number;
   age: string;
@@ -68,18 +71,21 @@ const initialForm: FormState = {
   sessionId: "",
   business: "",
   category: "Advocacia",
-  offer: "",
+  productOrService: "",
+  targetCustomer: "",
+  mainDifferential: "",
+  specialCondition: "",
   city: "",
   radius: 10,
   age: "30 a 60 anos",
   packageId: "grow",
 };
 
-const offerExamples: Record<string, string> = {
-  Advocacia: "Consultoria jurídica para pequenas empresas, com atendimento online e primeira conversa pelo WhatsApp.",
-  Saúde: "Consulta particular aos sábados, com atendimento humanizado e agendamento pelo WhatsApp.",
-  Loja: "Coleção de roupas femininas com peças a partir de R$ 59 e entrega para toda a cidade.",
-  Serviços: "Instalação e manutenção elétrica residencial, com orçamento rápido e atendimento na região.",
+const questionnaireExamples: Record<string, string[]> = {
+  Advocacia: ["Consultoria jurídica para pequenas empresas", "Empreendedores e profissionais autônomos", "Atendimento online e explicação em linguagem simples", "Primeira conversa sem custo"],
+  Saúde: ["Consulta médica particular", "Pessoas que procuram atendimento aos sábados", "Atendimento humanizado e horários flexíveis", "Primeira avaliação com valor especial"],
+  Loja: ["Roupas femininas da nova coleção", "Mulheres que buscam peças modernas para o dia a dia", "Entrega rápida e troca facilitada", "Peças a partir de R$ 59"],
+  Serviços: ["Instalação e manutenção elétrica residencial", "Moradores e pequenos comércios da região", "Orçamento rápido e atendimento no mesmo dia", "Avaliação inicial sem custo"],
 };
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
@@ -124,6 +130,13 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
   const forward = () => setStep((current) => Math.min(5, current + 1));
   const back = step > 1 ? () => setStep((current) => current - 1) : undefined;
   const phoneDigits = form.customerPhone.replace(/\D/g, "");
+  const examples = questionnaireExamples[form.category] || questionnaireExamples.Serviços;
+  const offerDescription = [
+    `Produto ou serviço: ${form.productOrService.trim()}.`,
+    `Público: ${form.targetCustomer.trim()}.`,
+    `Diferencial: ${form.mainDifferential.trim()}.`,
+    form.specialCondition.trim() ? `Condição especial: ${form.specialCondition.trim()}.` : "",
+  ].filter(Boolean).join(" ");
 
   const submitOnboarding = async () => {
     setSubmitting(true);
@@ -137,7 +150,7 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
           customer_phone: phoneDigits,
           business_name: form.business.trim(),
           niche_category: form.category,
-          offer_description: form.offer.trim(),
+          offer_description: offerDescription,
         }),
       });
       const responseText = await response.text();
@@ -172,14 +185,13 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     </div>
   </StepShell>;
 
-  if (step === 2) return <StepShell step={2} title="Conte um pouco sobre o que você quer anunciar" subtitle="Quanto mais clara for a descrição, melhores ficarão o texto e as imagens do seu anúncio." onBack={back} action={submitOnboarding} actionDisabled={!form.offer.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
+  if (step === 2) return <StepShell step={2} title="Vamos montar seu anúncio juntos" subtitle="Responda às perguntas abaixo. Nós organizaremos tudo para criar o texto e as imagens." onBack={back} action={submitOnboarding} actionDisabled={!form.productOrService.trim() || !form.targetCustomer.trim() || !form.mainDifferential.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
     <div className="simple-form offer-form">
-      <label>Descreva o produto, serviço ou promoção<textarea value={form.offer} onChange={(event) => update("offer", event.target.value)} placeholder={`Ex.: ${offerExamples[form.category] || offerExamples.Serviços}`} maxLength={240}/><small>{form.offer.length}/240</small></label>
-      <div className="offer-guidance">
-        <strong>Para criar um anúncio melhor, tente incluir:</strong>
-        <span><Icon name="check" size={14}/> O que você oferece</span>
-        <span><Icon name="check" size={14}/> Seu principal diferencial</span>
-        <span><Icon name="check" size={14}/> Promoção ou condição especial, se houver</span>
+      <div className="question-grid">
+        <label className="question-card"><span><b>1</b> O que você quer anunciar?</span><input value={form.productOrService} onChange={(event) => update("productOrService", event.target.value)} placeholder={`Ex.: ${examples[0]}`} maxLength={100}/></label>
+        <label className="question-card"><span><b>2</b> Para quem esse produto ou serviço é indicado?</span><input value={form.targetCustomer} onChange={(event) => update("targetCustomer", event.target.value)} placeholder={`Ex.: ${examples[1]}`} maxLength={100}/></label>
+        <label className="question-card"><span><b>3</b> Por que o cliente deveria escolher você?</span><input value={form.mainDifferential} onChange={(event) => update("mainDifferential", event.target.value)} placeholder={`Ex.: ${examples[2]}`} maxLength={120}/></label>
+        <label className="question-card"><span><b>4</b> Existe alguma promoção ou condição especial? <em>Opcional</em></span><input value={form.specialCondition} onChange={(event) => update("specialCondition", event.target.value)} placeholder={`Ex.: ${examples[3]}`} maxLength={100}/></label>
       </div>
       <div className="destination-box"><strong>Onde as pessoas podem falar com você?</strong><div>{[
         ["whatsapp", "whatsapp", "WhatsApp"], ["instagram", "phone", "Instagram"]
@@ -192,9 +204,9 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     <div className="creative-layout">
       <div className="ad-preview">
         <div className="ad-head"><span className="ad-avatar">F</span><div><b>{form.business}</b><small>Patrocinado</small></div><strong>•••</strong></div>
-        <p>{creative === 1 ? `Atendimento próximo e orientação segura para você e seu negócio. Fale com a ${form.business}.` : creative === 2 ? `Procurando atendimento de confiança? Conheça o trabalho da ${form.business}.` : `${form.offer} Fale agora com a nossa equipe.`}</p>
+        <p>{creative === 1 ? `Atendimento próximo e orientação segura para você e seu negócio. Fale com a ${form.business}.` : creative === 2 ? `Procurando atendimento de confiança? Conheça o trabalho da ${form.business}.` : `${form.productOrService}. Fale agora com a nossa equipe.`}</p>
         <div className={`ad-art creative-${creative}`}><span>{creative === 1 ? <>ATENDIMENTO<br/><b>QUE TRAZ<br/>SEGURANÇA.</b></> : creative === 2 ? <>CONFIANÇA PARA<br/><b>ESCOLHER<br/>MELHOR.</b></> : <>SEU NEGÓCIO<br/><b>MAIS PERTO<br/>DE VOCÊ.</b></>}</span><div className="abstract-person"><i/><b/><span/></div></div>
-        <div className="ad-cta"><span><small>FALE COM NOSSA EQUIPE</small><b>{form.offer.slice(0, 48)}</b></span><button>Enviar mensagem</button></div>
+        <div className="ad-cta"><span><small>FALE COM NOSSA EQUIPE</small><b>{form.productOrService.slice(0, 48)}</b></span><button>Enviar mensagem</button></div>
       </div>
       <div className="creative-controls"><span className="approved"><Icon name="shield" size={20}/><b>Conteúdo verificado pelo AnuncIA</b></span><h3>Qual opção você prefere?</h3><div className="creative-tabs">{[1,2,3].map((item) => <button key={item} className={creative === item ? "selected" : ""} onClick={() => setCreative(item)}>Opção {item}{creative === item && <Icon name="check" size={14}/>}</button>)}</div><p>A aprovação final do anúncio será realizada pela Meta.</p><button className="secondary"><Icon name="spark" size={18}/> Gerar outras opções</button><button className="text-button"><Icon name="image" size={18}/> Usar minha própria imagem</button></div>
     </div>
