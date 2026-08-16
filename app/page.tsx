@@ -82,10 +82,10 @@ const initialForm: FormState = {
 };
 
 const questionnaireExamples: Record<string, string[]> = {
-  Advocacia: ["Consultoria jurídica para pequenas empresas", "Empreendedores e profissionais autônomos", "Atendimento online e explicação em linguagem simples", "Primeira conversa sem custo"],
-  Saúde: ["Consulta médica particular", "Pessoas que procuram atendimento aos sábados", "Atendimento humanizado e horários flexíveis", "Primeira avaliação com valor especial"],
-  Loja: ["Roupas femininas da nova coleção", "Mulheres que buscam peças modernas para o dia a dia", "Entrega rápida e troca facilitada", "Peças a partir de R$ 59"],
-  Serviços: ["Instalação e manutenção elétrica residencial", "Moradores e pequenos comércios da região", "Orçamento rápido e atendimento no mesmo dia", "Avaliação inicial sem custo"],
+  Advocacia: ["Consultoria empresarial", "Pequenos empresários", "Atendimento online", "Primeira conversa grátis"],
+  Saúde: ["Consulta particular", "Adultos da região", "Horários aos sábados", "Avaliação com desconto"],
+  Loja: ["Nova coleção feminina", "Mulheres da região", "Entrega rápida", "A partir de R$ 59"],
+  Serviços: ["Manutenção elétrica", "Moradores da região", "Atendimento no mesmo dia", "Orçamento grátis"],
 };
 
 function Brand({ inverse = false }: { inverse?: boolean }) {
@@ -137,6 +137,14 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     `Diferencial: ${form.mainDifferential.trim()}.`,
     form.specialCondition.trim() ? `Condição especial: ${form.specialCondition.trim()}.` : "",
   ].filter(Boolean).join(" ");
+  const requiredAnswers = [form.productOrService, form.targetCustomer, form.mainDifferential];
+  const answeredRequired = requiredAnswers.filter((value) => value.trim()).length;
+  const briefingItems = [
+    { label: "Oferta", value: form.productOrService, icon: "campaign" as IconName },
+    { label: "Público", value: form.targetCustomer, icon: "users" as IconName },
+    { label: "Diferencial", value: form.mainDifferential, icon: "spark" as IconName },
+    { label: "Condição", value: form.specialCondition, icon: "money" as IconName, optional: true },
+  ];
 
   const submitOnboarding = async () => {
     setSubmitting(true);
@@ -185,17 +193,26 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     </div>
   </StepShell>;
 
-  if (step === 2) return <StepShell step={2} title="Vamos montar seu anúncio juntos" subtitle="Responda às perguntas abaixo. Nós organizaremos tudo para criar o texto e as imagens." onBack={back} action={submitOnboarding} actionDisabled={!form.productOrService.trim() || !form.targetCustomer.trim() || !form.mainDifferential.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
+  if (step === 2) return <StepShell step={2} title="Vamos montar seu anúncio juntos" subtitle="Você responde. A AnuncIA transforma suas respostas em texto e imagens." onBack={back} action={submitOnboarding} actionDisabled={!form.productOrService.trim() || !form.targetCustomer.trim() || !form.mainDifferential.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Criar meu anúncio"}>
     <div className="simple-form offer-form">
-      <div className="question-grid">
-        <label className="question-card"><span><b>1</b> O que você quer anunciar?</span><input value={form.productOrService} onChange={(event) => update("productOrService", event.target.value)} placeholder={`Ex.: ${examples[0]}`} maxLength={100}/></label>
-        <label className="question-card"><span><b>2</b> Para quem esse produto ou serviço é indicado?</span><input value={form.targetCustomer} onChange={(event) => update("targetCustomer", event.target.value)} placeholder={`Ex.: ${examples[1]}`} maxLength={100}/></label>
-        <label className="question-card"><span><b>3</b> Por que o cliente deveria escolher você?</span><input value={form.mainDifferential} onChange={(event) => update("mainDifferential", event.target.value)} placeholder={`Ex.: ${examples[2]}`} maxLength={120}/></label>
-        <label className="question-card"><span><b>4</b> Existe alguma promoção ou condição especial? <em>Opcional</em></span><input value={form.specialCondition} onChange={(event) => update("specialCondition", event.target.value)} placeholder={`Ex.: ${examples[3]}`} maxLength={100}/></label>
+      <div className="briefing-layout">
+        <div className="question-grid">
+          <label className={`question-card ${form.productOrService.trim() ? "answered" : ""}`}><span><b>1</b> O que você quer anunciar?{form.productOrService.trim() && <i><Icon name="check" size={13}/></i>}</span><input value={form.productOrService} onChange={(event) => update("productOrService", event.target.value)} placeholder={`Ex.: ${examples[0]}`} maxLength={100}/></label>
+          <label className={`question-card ${form.targetCustomer.trim() ? "answered" : ""}`}><span><b>2</b> Quem costuma contratar ou comprar?{form.targetCustomer.trim() && <i><Icon name="check" size={13}/></i>}</span><input value={form.targetCustomer} onChange={(event) => update("targetCustomer", event.target.value)} placeholder={`Ex.: ${examples[1]}`} maxLength={100}/></label>
+          <label className={`question-card ${form.mainDifferential.trim() ? "answered" : ""}`}><span><b>3</b> Qual é o seu principal diferencial?{form.mainDifferential.trim() && <i><Icon name="check" size={13}/></i>}</span><input value={form.mainDifferential} onChange={(event) => update("mainDifferential", event.target.value)} placeholder={`Ex.: ${examples[2]}`} maxLength={120}/></label>
+          <label className={`question-card ${form.specialCondition.trim() ? "answered" : ""}`}><span><b>4</b> Tem alguma oferta especial? <em>Opcional</em>{form.specialCondition.trim() && <i><Icon name="check" size={13}/></i>}</span><input value={form.specialCondition} onChange={(event) => update("specialCondition", event.target.value)} placeholder={`Ex.: ${examples[3]}`} maxLength={100}/></label>
+        </div>
+        <aside className="briefing-preview">
+          <div className="briefing-preview-head"><span><Icon name="spark" size={16}/> SEU BRIEFING</span><b>{answeredRequired}/3 essenciais</b></div>
+          <div className="briefing-progress"><span style={{width: `${(answeredRequired / 3) * 100}%`}}/></div>
+          <h3>Seu anúncio está tomando forma</h3>
+          <div className="briefing-list">{briefingItems.map((item) => <div className={item.value.trim() ? "filled" : ""} key={item.label}><span><Icon name={item.icon} size={15}/></span><p><small>{item.label}{item.optional ? " · opcional" : ""}</small><b>{item.value.trim() || "Aguardando resposta"}</b></p></div>)}</div>
+          <footer><Icon name="shield" size={15}/> Suas respostas serão organizadas automaticamente.</footer>
+        </aside>
       </div>
       <div className="destination-box"><strong>Onde as pessoas podem falar com você?</strong><div>{[
-        ["whatsapp", "whatsapp", "WhatsApp"], ["instagram", "phone", "Instagram"]
-      ].map(([value, icon, label]) => <button key={value} className={form.destination === value ? "selected" : ""} onClick={() => update("destination", value as FormState["destination"])}><Icon name={icon as IconName} size={20}/>{label}</button>)}</div></div>
+        ["whatsapp", "/whatsapp.svg", "WhatsApp"], ["instagram", "/instagram.svg", "Instagram"]
+      ].map(([value, logo, label]) => <button key={value} className={form.destination === value ? "selected" : ""} onClick={() => update("destination", value as FormState["destination"])}><img className="channel-logo" src={logo} alt=""/>{label}</button>)}</div></div>
       {submitError && <div className="form-error" role="alert">{submitError}</div>}
     </div>
   </StepShell>;
