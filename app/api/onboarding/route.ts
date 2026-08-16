@@ -12,8 +12,10 @@ type OnboardingBody = {
 type N8nResponse = {
   ok?: boolean;
   session_id?: string;
+  status?: string;
   next_step?: string;
   reply?: string;
+  error?: string;
 };
 
 function cleanText(value: unknown, maxLength: number) {
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
   }
 
   const callN8n = async (payload: Record<string, string>): Promise<N8nResponse> => {
-    const response = await fetch(`${n8nBaseUrl}/webhook/chat-onboarding`, {
+    const response = await fetch(`${n8nBaseUrl}/webhook/anuncia/v1/session`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -60,27 +62,34 @@ export async function POST(request: Request) {
       throw new Error(`O onboarding respondeu com status ${response.status}.`);
     }
 
-    return response.json() as Promise<N8nResponse>;
+    const responseText = await response.text();
+    let responseBody: N8nResponse | N8nResponse[];
+
+    try {
+      responseBody = JSON.parse(responseText) as N8nResponse | N8nResponse[];
+    } catch {
+      throw new Error("O onboarding retornou uma resposta inválida.");
+    }
+
+    return Array.isArray(responseBody) ? responseBody[0] : responseBody;
   };
 
   try {
-    let result = await callN8n({ session_id: "", customer_phone: customerPhone, message: "" });
+    const result = await callN8n({
+      customer_phone: customerPhone,
+      business_name: businessName,
+      niche_category: nicheCategory,
+      offer_description: offerDescription,
+    });
     const sessionId = result.session_id;
 
-    if (!sessionId) throw new Error("O onboarding não criou uma sessão.");
-
-    for (const message of [businessName, nicheCategory, offerDescription]) {
-      result = await callN8n({ session_id: sessionId, customer_phone: customerPhone, message });
-    }
-
-    if (result.next_step !== "gerar_criativo") {
-      throw new Error(result.reply || "Não foi possível concluir o cadastro.");
-    }
+    if (!sessionId) throw new Error(result.error || result.reply || "O onboarding não criou uma sessão.");
 
     return NextResponse.json({
       ok: true,
       session_id: sessionId,
-      next_step: result.next_step,
+      status: result.status,
+      next_step: result.next_step || "gerar_criativo",
       reply: result.reply,
     });
   } catch (error) {
