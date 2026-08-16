@@ -75,16 +75,10 @@ function Brand({ inverse = false }: { inverse?: boolean }) {
   return <div className={inverse ? "brand inverse" : "brand"}><span className="brand-symbol"><i/><b/></span><span>anunc<span>IA</span></span></div>;
 }
 
-function TopBar({ view, onView }: { view: View; onView: (view: View) => void }) {
+function TopBar({ view }: { view: View }) {
   return (
     <header className="topbar">
       <Brand />
-      <div className="demo-switch" aria-label="Alternar visualização">
-        <span>Visualizar como:</span>
-        <button className={view === "onboarding" ? "active" : ""} onClick={() => onView("onboarding")}>Novo cliente</button>
-        <button className={view === "client" ? "active" : ""} onClick={() => onView("client")}>Cliente</button>
-        <button className={view === "admin" ? "active" : ""} onClick={() => onView("admin")}>Admin</button>
-      </div>
       <div className="profile-chip"><span>SF</span><div><b>Saulo Fernandes</b><small>{view === "admin" ? "Administrador" : "Minha conta"}</small></div></div>
     </header>
   );
@@ -209,5 +203,5 @@ export default function Home() {
   const [complete, setComplete] = useState(false);
   const title = useMemo(() => complete ? "Anúncio criado" : view === "onboarding" ? "Criar anúncio" : view === "client" ? "Painel do cliente" : "Painel administrativo", [complete, view]);
   const navigate = (next: View) => { setView(next); setComplete(false); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  return <main className="app"><TopBar view={view} onView={navigate}/><div className="sr-only" aria-live="polite">{title}</div>{complete ? <Confirmation onDashboard={() => navigate("client")}/> : view === "onboarding" ? <Onboarding onComplete={() => setComplete(true)}/> : view === "client" ? <ClientDashboard onNavigate={navigate}/> : <AdminDashboard onNavigate={navigate}/>}</main>;
+  return <main className="app"><TopBar view={view}/><div className="sr-only" aria-live="polite">{title}</div>{complete ? <Confirmation onDashboard={() => navigate("client")}/> : view === "onboarding" ? <Onboarding onComplete={() => setComplete(true)}/> : view === "client" ? <ClientDashboard onNavigate={navigate}/> : <AdminDashboard onNavigate={navigate}/>}</main>;
 }
