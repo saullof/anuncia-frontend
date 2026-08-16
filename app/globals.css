@@ -65,6 +65,8 @@ button { cursor: pointer; }
 .simple-form input, .simple-form select { height: 48px; padding: 0 14px; }.simple-form textarea { min-height: 128px; padding: 14px; resize: vertical; line-height: 1.5; }
 .simple-form input:focus, .simple-form textarea:focus, .simple-form select:focus { border-color: var(--orange); box-shadow: 0 0 0 3px var(--orange-soft); }
 .simple-form label > small { position: absolute; right: 11px; bottom: 10px; color: #a4a4a3; font-size: 10px; }
+.field-hint { display: block; margin-top: 6px; color: #8b8d92; font-size: 10px; font-weight: 500; }
+.form-error { padding: 12px 14px; border: 1px solid #f2b9b3; border-radius: 10px; background: #fff3f1; color: #b53c32; font-size: 12px; line-height: 1.4; }
 .segment-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 8px; }
 .segment-grid button { height: 85px; border: 1px solid #dfddd9; border-radius: 12px; background: #fff; color: #666970; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; font-size: 11px; font-weight: 700; position: relative; }
 .segment-grid button.selected { border: 2px solid var(--orange); color: var(--orange-dark); background: #fffcfa; }.segment-grid button > span { position: absolute; right: 7px; top: 7px; width: 19px; height: 19px; border-radius: 50%; background: var(--orange); color: #fff; display: grid; place-items: center; }
