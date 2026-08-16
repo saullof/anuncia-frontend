@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   const customerPhone = cleanText(body.customer_phone, 15).replace(/\D/g, "");
   const businessName = cleanText(body.business_name, 120);
   const nicheCategory = cleanText(body.niche_category, 80);
-  const offerDescription = cleanText(body.offer_description, 240);
+  const offerDescription = cleanText(body.offer_description, 500);
 
   if (customerPhone.length < 10 || !businessName || !nicheCategory || !offerDescription) {
     return NextResponse.json({ ok: false, error: "Preencha corretamente todos os campos." }, { status: 400 });
