@@ -75,6 +75,13 @@ const initialForm: FormState = {
   packageId: "grow",
 };
 
+const offerExamples: Record<string, string> = {
+  Advocacia: "Consultoria jurídica para pequenas empresas, com atendimento online e primeira conversa pelo WhatsApp.",
+  Saúde: "Consulta particular aos sábados, com atendimento humanizado e agendamento pelo WhatsApp.",
+  Loja: "Coleção de roupas femininas com peças a partir de R$ 59 e entrega para toda a cidade.",
+  Serviços: "Instalação e manutenção elétrica residencial, com orçamento rápido e atendimento na região.",
+};
+
 function Brand({ inverse = false }: { inverse?: boolean }) {
   return <div className={inverse ? "brand inverse" : "brand"}><span className="brand-symbol"><i/><b/></span><span>anunc<span>IA</span></span></div>;
 }
@@ -165,9 +172,15 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     </div>
   </StepShell>;
 
-  if (step === 2) return <StepShell step={2} title="O que você quer divulgar?" subtitle="Me descreva em uma frase. Pode ser um produto, serviço ou promoção." onBack={back} action={submitOnboarding} actionDisabled={!form.offer.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
+  if (step === 2) return <StepShell step={2} title="Conte um pouco sobre o que você quer anunciar" subtitle="Quanto mais clara for a descrição, melhores ficarão o texto e as imagens do seu anúncio." onBack={back} action={submitOnboarding} actionDisabled={!form.offer.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Continuar"}>
     <div className="simple-form offer-form">
-      <label>Produto, serviço ou promoção<textarea value={form.offer} onChange={(event) => update("offer", event.target.value)} placeholder="Ex.: Consulta médica particular com atendimento aos sábados." maxLength={240}/><small>{form.offer.length}/240</small></label>
+      <label>Descreva o produto, serviço ou promoção<textarea value={form.offer} onChange={(event) => update("offer", event.target.value)} placeholder={`Ex.: ${offerExamples[form.category] || offerExamples.Serviços}`} maxLength={240}/><small>{form.offer.length}/240</small></label>
+      <div className="offer-guidance">
+        <strong>Para criar um anúncio melhor, tente incluir:</strong>
+        <span><Icon name="check" size={14}/> O que você oferece</span>
+        <span><Icon name="check" size={14}/> Seu principal diferencial</span>
+        <span><Icon name="check" size={14}/> Promoção ou condição especial, se houver</span>
+      </div>
       <div className="destination-box"><strong>Onde as pessoas podem falar com você?</strong><div>{[
         ["whatsapp", "whatsapp", "WhatsApp"], ["instagram", "phone", "Instagram"]
       ].map(([value, icon, label]) => <button key={value} className={form.destination === value ? "selected" : ""} onClick={() => update("destination", value as FormState["destination"])}><Icon name={icon as IconName} size={20}/>{label}</button>)}</div></div>
