@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type IconName =
   | "arrow" | "back" | "briefcase" | "campaign" | "chart" | "check" | "chevron"
@@ -59,6 +59,16 @@ type FormState = {
   packageId: "start" | "grow" | "highlight";
 };
 
+type CreativeOption = {
+  id: string;
+  index: number;
+  image_url: string;
+  primary_text: string;
+  headline: string;
+};
+
+type CreativeMode = "ai" | "upload" | "";
+
 const plans = [
   { id: "start" as const, price: 97, label: "Para começar", reach: "4 a 7 mil" },
   { id: "grow" as const, price: 149, label: "Mais escolhido", reach: "8 a 13 mil" },
@@ -70,7 +80,7 @@ const initialForm: FormState = {
   customerPhone: "",
   sessionId: "",
   business: "",
-  category: "Advocacia",
+  category: "",
   productOrService: "",
   targetCustomer: "",
   mainDifferential: "",
@@ -119,11 +129,62 @@ function StepShell({ step, title, subtitle, onBack, children, action, actionDisa
   );
 }
 
+const generationStages = [
+  { title: "Organizando seu briefing", detail: "Transformando suas respostas em uma direção criativa clara.", progress: 18 },
+  { title: "Escrevendo a mensagem do anúncio", detail: "Criando textos simples, diretos e adequados ao seu público.", progress: 36 },
+  { title: "Desenhando três propostas visuais", detail: "Cada opção está sendo criada especialmente para o seu negócio.", progress: 62 },
+  { title: "Revisando conteúdo e qualidade", detail: "Conferindo clareza, aparência e políticas de publicidade.", progress: 82 },
+  { title: "Finalizando suas opções", detail: "Estamos nos últimos ajustes. Falta muito pouco.", progress: 94 },
+];
+
+function CreativeLoading({ business, stage }: { business: string; stage: number }) {
+  const current = generationStages[Math.min(stage, generationStages.length - 1)];
+
+  return (
+    <div className="creative-loading-page" role="status" aria-live="polite">
+      <div className="creative-loading-card">
+        <div className="loading-brand"><Brand /><span>CRIANDO PARA {business || "SEU NEGÓCIO"}</span></div>
+        <div className="loading-visual" aria-hidden="true">
+          <div className="loading-orbit"><span/><i/><b/></div>
+          <div className="loading-spark"><Icon name="spark" size={28}/></div>
+          <div className="loading-mini-card card-one"><span/><b/><i/></div>
+          <div className="loading-mini-card card-two"><span/><b/><i/></div>
+          <div className="loading-mini-card card-three"><span/><b/><i/></div>
+        </div>
+        <div className="loading-copy">
+          <span>A IA ESTÁ TRABALHANDO AGORA</span>
+          <h1>{current.title}</h1>
+          <p>{current.detail}</p>
+        </div>
+        <div className="loading-progress" aria-label={`${current.progress}% concluído`}>
+          <div><span style={{ width: `${current.progress}%` }}/></div>
+          <b>{current.progress}%</b>
+        </div>
+        <div className="loading-steps">
+          {generationStages.map((item, index) => (
+            <div key={item.title} className={index < stage ? "done" : index === stage ? "active" : ""}>
+              <span>{index < stage ? <Icon name="check" size={13}/> : index + 1}</span>
+              <p>{item.title}</p>
+            </div>
+          ))}
+        </div>
+        <div className="loading-note"><Icon name="clock" size={17}/><span><b>Você não precisa atualizar a página.</b> Normalmente isso leva entre 1 e 3 minutos.</span></div>
+      </div>
+    </div>
+  );
+}
+
 function Onboarding({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(1);
-  const [creative, setCreative] = useState(1);
   const [form, setForm] = useState<FormState>(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [generationStage, setGenerationStage] = useState(0);
+  const [creativeMode, setCreativeMode] = useState<CreativeMode>("");
+  const [creativeOptions, setCreativeOptions] = useState<CreativeOption[]>([]);
+  const [selectedCreativeId, setSelectedCreativeId] = useState("");
+  const [uploadedImage, setUploadedImage] = useState("");
+  const [uploadedImageName, setUploadedImageName] = useState("");
   const [submitError, setSubmitError] = useState("");
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }));
   const plan = plans.find((item) => item.id === form.packageId)!;
@@ -146,44 +207,141 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     { label: "Condição", value: form.specialCondition, icon: "money" as IconName, optional: true },
   ];
 
+  const selectedCreative = creativeOptions.find((option) => option.id === selectedCreativeId) || creativeOptions[0];
+
+  useEffect(() => {
+    if (!generating) return;
+
+    const interval = window.setInterval(() => {
+      setGenerationStage((current) => Math.min(generationStages.length - 1, current + 1));
+    }, 6500);
+
+    return () => window.clearInterval(interval);
+  }, [generating]);
+
+  const selectUploadedImage = (file?: File) => {
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setSubmitError("Escolha um arquivo de imagem válido.");
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setSubmitError("A imagem deve ter no máximo 8 MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setUploadedImage(String(reader.result || ""));
+      setUploadedImageName(file.name);
+      setSubmitError("");
+    };
+    reader.readAsDataURL(file);
+  };
+
   const submitOnboarding = async () => {
     setSubmitting(true);
     setSubmitError("");
 
     try {
-      const response = await fetch("/api/onboarding", {
+      let sessionId = form.sessionId;
+
+      if (!sessionId) {
+        const response = await fetch("/api/onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customer_phone: phoneDigits,
+            business_name: form.business.trim(),
+            niche_category: form.category,
+            offer_description: offerDescription,
+          }),
+        });
+        const responseText = await response.text();
+        let data: { ok?: boolean; session_id?: string; error?: string };
+
+        try {
+          data = JSON.parse(responseText);
+        } catch {
+          throw new Error("O servidor está temporariamente indisponível. Tente novamente em instantes.");
+        }
+
+        if (!response.ok || !data.ok || !data.session_id) {
+          throw new Error(data.error || "Não foi possível salvar seus dados agora.");
+        }
+
+        sessionId = data.session_id;
+        update("sessionId", sessionId);
+      }
+
+      if (creativeMode === "upload") {
+        if (!uploadedImage) throw new Error("Envie a imagem que deseja utilizar.");
+
+        const uploadResponse = await fetch("/api/creative/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            session_id: sessionId,
+            image_data_url: uploadedImage,
+            file_name: uploadedImageName,
+          }),
+        });
+        const uploadResponseText = await uploadResponse.text();
+        let uploadData: { ok?: boolean; error?: string; options?: CreativeOption[] };
+
+        try {
+          uploadData = JSON.parse(uploadResponseText);
+        } catch {
+          throw new Error("O envio da imagem retornou uma resposta inválida.");
+        }
+
+        if (!uploadResponse.ok || !uploadData.ok || !uploadData.options?.length) {
+          throw new Error(uploadData.error || "Não foi possível enviar sua imagem agora.");
+        }
+
+        setCreativeOptions(uploadData.options);
+        setSelectedCreativeId(uploadData.options[0].id);
+        setStep(3);
+        return;
+      }
+
+      setGenerationStage(0);
+      setGenerating(true);
+
+      const creativeResponse = await fetch("/api/creative/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customer_phone: phoneDigits,
-          business_name: form.business.trim(),
-          niche_category: form.category,
-          offer_description: offerDescription,
-        }),
+        body: JSON.stringify({ session_id: sessionId }),
       });
-      const responseText = await response.text();
-      let data: { ok?: boolean; session_id?: string; error?: string };
+      const creativeResponseText = await creativeResponse.text();
+      let creativeData: { ok?: boolean; error?: string; options?: CreativeOption[] };
 
       try {
-        data = JSON.parse(responseText);
+        creativeData = JSON.parse(creativeResponseText);
       } catch {
-        throw new Error("O servidor está temporariamente indisponível. Tente novamente em instantes.");
+        throw new Error("O gerador retornou uma resposta inválida.");
       }
 
-      if (!response.ok || !data.ok || !data.session_id) {
-        throw new Error(data.error || "Não foi possível salvar seus dados agora.");
+      if (!creativeResponse.ok || !creativeData.ok || !creativeData.options?.length) {
+        throw new Error(creativeData.error || "Não foi possível gerar seus criativos agora.");
       }
 
-      update("sessionId", data.session_id);
-      forward();
+      setCreativeOptions(creativeData.options);
+      setSelectedCreativeId(creativeData.options[0].id);
+      setStep(3);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Não foi possível salvar seus dados agora.");
     } finally {
+      setGenerating(false);
       setSubmitting(false);
     }
   };
 
-  if (step === 1) return <StepShell step={1} title="Qual é o nome do seu negócio?" subtitle="Vamos começar pelo básico. Você não precisa entender de anúncios." action={forward} actionDisabled={!form.business.trim() || phoneDigits.length < 10}>
+  if (generating) return <CreativeLoading business={form.business} stage={generationStage}/>;
+
+  if (step === 1) return <StepShell step={1} title="Qual é o nome do seu negócio?" subtitle="Vamos começar pelo básico. Você não precisa entender de anúncios." action={forward} actionDisabled={!form.business.trim() || !form.category || phoneDigits.length < 10}>
     <div className="simple-form">
       <label>Nome do negócio<input value={form.business} onChange={(event) => update("business", event.target.value)} placeholder="Ex.: Clínica Sorriso"/></label>
       <label>Seu WhatsApp<input type="tel" inputMode="tel" value={form.customerPhone} onChange={(event) => update("customerPhone", event.target.value)} placeholder="Ex.: 5521999990001"/><span className="field-hint">Use DDI e DDD. Ex.: 5521999990001</span></label>
@@ -193,7 +351,7 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
     </div>
   </StepShell>;
 
-  if (step === 2) return <StepShell step={2} title="Vamos montar seu anúncio juntos" subtitle="Você responde. A AnuncIA transforma suas respostas em texto e imagens." onBack={back} action={submitOnboarding} actionDisabled={!form.productOrService.trim() || !form.targetCustomer.trim() || !form.mainDifferential.trim() || submitting} actionLabel={submitting ? "Salvando..." : "Criar meu anúncio"}>
+  if (step === 2) return <StepShell step={2} title="Vamos montar seu anúncio juntos" subtitle="Você responde e escolhe se quer uma arte nova ou utilizar uma imagem que já possui." onBack={back} action={submitOnboarding} actionDisabled={!form.productOrService.trim() || !form.targetCustomer.trim() || !form.mainDifferential.trim() || !creativeMode || (creativeMode === "upload" && !uploadedImage) || submitting} actionLabel={submitting ? "Preparando..." : creativeMode === "upload" ? "Continuar com minha imagem" : "Gerar meus criativos"}>
     <div className="simple-form offer-form">
       <div className="briefing-layout">
         <div className="question-grid">
@@ -213,20 +371,45 @@ function Onboarding({ onComplete }: { onComplete: () => void }) {
       <div className="destination-box"><strong>Onde as pessoas podem falar com você?</strong><div>{[
         ["whatsapp", "/whatsapp.svg", "WhatsApp"], ["instagram", "/instagram.svg", "Instagram"]
       ].map(([value, logo, label]) => <button key={value} className={form.destination === value ? "selected" : ""} onClick={() => update("destination", value as FormState["destination"])}><img className="channel-logo" src={logo} alt=""/>{label}</button>)}</div></div>
+      <section className="creative-source-box">
+        <div className="creative-source-heading"><span><Icon name="image" size={19}/></span><div><h3>Como você quer criar a arte?</h3><p>Escolha antes de continuar. Se você já possui uma imagem, não utilizaremos a geração por IA.</p></div></div>
+        <div className="creative-source-grid">
+          <button type="button" className={creativeMode === "ai" ? "selected" : ""} onClick={() => { setCreativeMode("ai"); setSubmitError(""); }}>
+            <span><Icon name="spark" size={23}/></span><div><b>Criar com a AnuncIA</b><small>Receba 3 opções feitas para o seu negócio.</small></div><i>{creativeMode === "ai" && <Icon name="check" size={13}/>}</i>
+          </button>
+          <button type="button" className={creativeMode === "upload" ? "selected" : ""} onClick={() => { setCreativeMode("upload"); setSubmitError(""); }}>
+            <span><Icon name="image" size={23}/></span><div><b>Usar minha própria arte</b><small>Envie uma imagem pronta e pule a geração.</small></div><i>{creativeMode === "upload" && <Icon name="check" size={13}/>}</i>
+          </button>
+        </div>
+        {creativeMode === "upload" && <label className={uploadedImage ? "creative-upload has-file" : "creative-upload"}>
+          <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => selectUploadedImage(event.target.files?.[0])}/>
+          {uploadedImage ? <><img src={uploadedImage} alt="Prévia da arte enviada"/><span><b>{uploadedImageName}</b><small>Clique para substituir a imagem</small></span><Icon name="check" size={19}/></> : <><span className="upload-icon"><Icon name="plus" size={23}/></span><span><b>Enviar minha imagem</b><small>PNG, JPG ou WEBP · máximo de 8 MB</small></span></>}
+        </label>}
+      </section>
       {submitError && <div className="form-error" role="alert">{submitError}</div>}
     </div>
   </StepShell>;
 
-  if (step === 3) return <StepShell step={3} title="Seu anúncio está pronto" subtitle="Geramos 3 opções de arte para você escolher. Se não gostar, pode pedir outra versão." onBack={back} action={forward}>
+  if (step === 3 && selectedCreative) return <StepShell step={3} title="Seu anúncio está pronto" subtitle={creativeMode === "ai" ? "Criamos opções exclusivas para você escolher." : "Veja como sua imagem aparecerá no anúncio."} onBack={back} action={forward}>
     <div className="creative-layout">
       <div className="ad-preview">
         <div className="ad-head"><span className="ad-avatar">F</span><div><b>{form.business}</b><small>Patrocinado</small></div><strong>•••</strong></div>
-        <p>{creative === 1 ? `Atendimento próximo e orientação segura para você e seu negócio. Fale com a ${form.business}.` : creative === 2 ? `Procurando atendimento de confiança? Conheça o trabalho da ${form.business}.` : `${form.productOrService}. Fale agora com a nossa equipe.`}</p>
-        <div className={`ad-art creative-${creative}`}><span>{creative === 1 ? <>ATENDIMENTO<br/><b>QUE TRAZ<br/>SEGURANÇA.</b></> : creative === 2 ? <>CONFIANÇA PARA<br/><b>ESCOLHER<br/>MELHOR.</b></> : <>SEU NEGÓCIO<br/><b>MAIS PERTO<br/>DE VOCÊ.</b></>}</span><div className="abstract-person"><i/><b/><span/></div></div>
-        <div className="ad-cta"><span><small>FALE COM NOSSA EQUIPE</small><b>{form.productOrService.slice(0, 48)}</b></span><button>Enviar mensagem</button></div>
+        <p>{selectedCreative.primary_text || offerDescription}</p>
+        <div className="generated-ad-art"><img src={selectedCreative.image_url} alt="Arte selecionada para o anúncio"/></div>
+        <div className="ad-cta"><span><small>FALE COM NOSSA EQUIPE</small><b>{selectedCreative.headline || form.productOrService.slice(0, 48)}</b></span><button>Enviar mensagem</button></div>
       </div>
-      <div className="creative-controls"><span className="approved"><Icon name="shield" size={20}/><b>Conteúdo verificado pelo AnuncIA</b></span><h3>Qual opção você prefere?</h3><div className="creative-tabs">{[1,2,3].map((item) => <button key={item} className={creative === item ? "selected" : ""} onClick={() => setCreative(item)}>Opção {item}{creative === item && <Icon name="check" size={14}/>}</button>)}</div><p>A aprovação final do anúncio será realizada pela Meta.</p><button className="secondary"><Icon name="spark" size={18}/> Gerar outras opções</button><button className="text-button"><Icon name="image" size={18}/> Usar minha própria imagem</button></div>
+      <div className="creative-controls">
+        <span className="approved"><Icon name="shield" size={20}/><b>{creativeMode === "ai" ? "Conteúdo verificado pelo AnuncIA" : "Sua arte foi adicionada"}</b></span>
+        <h3>{creativeMode === "ai" ? "Qual opção você prefere?" : "Gostou da prévia?"}</h3>
+        {creativeMode === "ai" ? <div className="creative-tabs">{creativeOptions.map((option, position) => <button key={option.id} className={selectedCreativeId === option.id ? "selected" : ""} onClick={() => setSelectedCreativeId(option.id)}>Opção {position + 1}{selectedCreativeId === option.id && <Icon name="check" size={14}/>}</button>)}</div> : <div className="own-art-summary"><Icon name="image" size={20}/><span><b>{uploadedImageName}</b><small>Imagem enviada por você</small></span></div>}
+        <p>A aprovação final do anúncio será realizada pela Meta.</p>
+        {creativeMode === "upload" && <button className="secondary" onClick={() => setStep(2)}><Icon name="image" size={18}/> Trocar minha imagem</button>}
+      </div>
     </div>
+  </StepShell>;
+
+  if (step === 3) return <StepShell step={3} title="Não encontramos a arte selecionada" subtitle="Volte uma etapa para escolher como deseja criar o anúncio." onBack={back} action={() => setStep(2)} actionLabel="Voltar para escolher">
+    <div className="form-error" role="alert">A prévia não está disponível. Sua sessão foi preservada e você pode tentar novamente.</div>
   </StepShell>;
 
   if (step === 4) return <StepShell step={4} title="Onde estão seus clientes?" subtitle="Escolha a região. O restante nós ajustamos para você." onBack={back} action={forward}>
